@@ -1,0 +1,14 @@
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+	<f:entry title="Job Name" field="jobName">
+		<f:textbox/>
+	</f:entry>
+	<f:entry title="Name of environment variable to set" field="envVarName">
+		<f:textbox/>
+	</f:entry>
+	<f:entry title="Parameters" field="parameters">
+		<f:textarea/>
+	</f:entry>
+	<f:entry title="Max wait limit (minutes)" field="waitLimitMinutes">
+		<f:textarea/>
+	</f:entry>
+</j:jelly>
