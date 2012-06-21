@@ -9,6 +9,6 @@
 		<f:textarea/>
 	</f:entry>
 	<f:entry title="Max wait limit (minutes)" field="waitLimitMinutes">
-		<f:textarea/>
+		<f:textbox/>
 	</f:entry>
 </j:jelly>
