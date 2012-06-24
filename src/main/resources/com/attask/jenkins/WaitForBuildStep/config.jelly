@@ -6,14 +6,26 @@
 		<f:textbox/>
 	</f:entry>
 
-	<f:entry title="Number of times to poll" field="retries" help="'0' for infinite">
-		<f:textbox/>
-	</f:entry>
-	<f:entry title="Time in-between polling (milliseconds)" field="delay">
-		<f:textbox/>
-	</f:entry>
+	<f:advanced>
+		<f:entry title="Number of times to poll" field="retries" help="'0' for infinite">
+			<f:textbox/>
+		</f:entry>
+		<f:entry title="Time in-between polling (milliseconds)" field="delay">
+			<f:textbox/>
+		</f:entry>
 
-	<f:entry title="Artifacts to copy" field="filesToCopy">
-		<f:textbox/>
-	</f:entry>
+		<f:entry title="Artifacts to copy" field="filesToCopy">
+			<f:textbox/>
+		</f:entry>
+
+		<f:entry title="Copy downstream result" field="copyBuildResult">
+			<f:checkbox/>
+		</f:entry>
+		<f:entry title="Terminate if downstream fails" field="failOnFailure">
+			<f:checkbox/>
+		</f:entry>
+		<f:entry title="Number of failure lines to log" field="numberLogLinesToCopyOnFailure">
+			<f:textbox/>
+		</f:entry>
+	</f:advanced>
 </j:jelly>

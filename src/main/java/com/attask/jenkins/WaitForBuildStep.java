@@ -4,16 +4,15 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.*;
-import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
 import hudson.util.IOUtils;
 import org.apache.tools.ant.DirectoryScanner;
-import org.apache.tools.ant.FileScanner;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.*;
+import java.util.List;
 
 /**
  * User: joeljohnson
@@ -26,15 +25,20 @@ public class WaitForBuildStep extends Builder {
 	public final int retries;
 	public final int delay;
 	public final String filesToCopy;
-	public final boolean copyBuildResult = true;
+	public final boolean copyBuildResult;
+	public final boolean failOnFailure;
+	public final int numberLogLinesToCopyOnFailure;
 
     @DataBoundConstructor
-    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy) throws FormValidation {
+    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure) throws FormValidation {
         this.jobName = jobName;
 		this.buildNumber = buildNumber;
 		this.retries = retries < 0 ? 0 : retries;
 		this.delay = delay < 5000 ? 5000 : delay;
 		this.filesToCopy = filesToCopy;
+		this.copyBuildResult = copyBuildResult;
+		this.failOnFailure = failOnFailure;
+		this.numberLogLinesToCopyOnFailure = numberLogLinesToCopyOnFailure;
     }
 
 	@Override
@@ -42,12 +46,12 @@ public class WaitForBuildStep extends Builder {
 		final PrintStream logger = listener.getLogger();
 		EnvVars envVars = build.getEnvironment(listener);
 		Hudson jenkins = Hudson.getInstance();
-		
+
 		String jobName = envVars.expand(this.jobName);
 		TopLevelItem topLevelItem = jenkins.getItem(jobName);
 
 		if(topLevelItem == null || !(topLevelItem instanceof Job)) {
-			listener.getLogger().println(jobName + " is not a Job {" + topLevelItem + "}");
+			logger.println(jobName + " is not a Job {" + topLevelItem + "}");
 			return false;
 		}
 
@@ -79,8 +83,26 @@ public class WaitForBuildStep extends Builder {
 			listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
 			logger.println(" didn't finish");
 		} else {
-			build.setResult(buildToWaitFor.getResult());
+			Result downstreamResult = buildToWaitFor.getResult();
+			if(copyBuildResult) {
+				build.setResult(downstreamResult);
+				listener.error("Downstream build ended with the status: " + downstreamResult);
+				if(downstreamResult.isWorseOrEqualTo(Result.FAILURE) && failOnFailure) {
+					listener.error("Downstream build failed. Will not continue this build.");
+					waitResult = false; //don't continue with other jobs
+				}
+			}
+			logger.println("Copying artifacts from downstream build.");
 			copyArtifacts(filesToCopy, buildToWaitFor, new File(build.getWorkspace().getRemote()), listener);
+
+			if(downstreamResult.isWorseOrEqualTo(Result.FAILURE) && numberLogLinesToCopyOnFailure > 0) {
+				List<String> log = buildToWaitFor.getLog(numberLogLinesToCopyOnFailure+1); //Add one more because it adds the "truncated X lines" as the first line
+				int numberPrinting = log.size() >= numberLogLinesToCopyOnFailure ? numberLogLinesToCopyOnFailure : log.size();
+				logger.println(buildToWaitFor.getFullDisplayName() + " failed. Here's the last " + numberPrinting + " console lines:");
+				for (String s : log) {
+					logger.println("["+buildToWaitFor.getFullDisplayName()+"]"+s);
+				}
+			}
 		}
 		return waitResult;
 	}
@@ -91,6 +113,9 @@ public class WaitForBuildStep extends Builder {
 	}
 
 	private void copyArtifacts(String filesToCopy, Run build, File workspace, BuildListener listener) {
+		if(filesToCopy == null || filesToCopy.isEmpty() || build == null) {
+			return;
+		}
 		DirectoryScanner scanner = new DirectoryScanner();
 		scanner.setIncludes(new String[] {filesToCopy});
 		scanner.setBasedir(build.getArtifactsDir());
@@ -139,10 +164,12 @@ public class WaitForBuildStep extends Builder {
 					return FormValidation.error("Build Number is a required field");
 				}
 				if(value.contains("$")) {
-					return FormValidation.warning("It appears you are using a variable. Unable to validate the Build Number.");
+//					return FormValidation.warning("It appears you are using a variable. Unable to validate the Build Number.");
+					return FormValidation.ok();
 				}
 				if(jobName.contains("$")) {
-					return FormValidation.warning("It appears you are using a variable for Job Name. Unable to validate the Build Number.");
+//					return FormValidation.warning("It appears you are using a variable for Job Name. Unable to validate the Build Number.");
+					return FormValidation.ok();
 				}
 
 				int buildNumber = Integer.parseInt(value);

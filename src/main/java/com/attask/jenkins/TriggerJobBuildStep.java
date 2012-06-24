@@ -67,20 +67,13 @@ public class TriggerJobBuildStep extends Builder {
 		final AbstractProject job = (AbstractProject)topLevelItem;
 		final int nextBuildNumber = triggerBuild(build, listener, job);
 		if(nextBuildNumber < 0) {
+			listener.error("Couldn't start the build. Error code: " + nextBuildNumber);
 			return false;
 		}
 
 		if(variableName != null && !variableName.isEmpty()) {
-			build.addAction(new EnvironmentContributingAction() {
-				public void buildEnvVars(AbstractBuild<?, ?> build, EnvVars env) {
-					listener.getLogger().println("setting environment variable '" + variableName + "' to '" + nextBuildNumber + "'");
-					env.put(variableName, String.valueOf(nextBuildNumber));
-				}
-
-				public String getIconFileName() { return null; }
-				public String getDisplayName() { return null; }
-				public String getUrlName() { return null; }
-			});
+			listener.getLogger().println("setting environment variable '" + variableName + "' to '" + nextBuildNumber + "'");
+			build.addAction(new EnvAction(variableName, String.valueOf(nextBuildNumber)));
 		}
 		return true;
 	}
@@ -133,14 +126,18 @@ public class TriggerJobBuildStep extends Builder {
 
 		@SuppressWarnings("unchecked")
 		ParametersDefinitionProperty projectProperties = (ParametersDefinitionProperty)project.getProperty(ParametersDefinitionProperty.class);
-		List<ParameterDefinition> parameterDefinitions = projectProperties.getParameterDefinitions();
-		for (ParameterDefinition parameterDefinition : parameterDefinitions) {
-			ParameterValue defaultParameterValue = parameterDefinition.getDefaultParameterValue();
-			String propertyName = defaultParameterValue.getName();
-			if(propertiesMap.containsKey(propertyName)) {
-				result.add(new StringParameterValue(propertyName, propertiesMap.get(propertyName)));
-			} else {
-				result.add(defaultParameterValue);
+		if(projectProperties != null) {
+			List<ParameterDefinition> parameterDefinitions = projectProperties.getParameterDefinitions();
+			if(parameterDefinitions != null) {
+				for (ParameterDefinition parameterDefinition : parameterDefinitions) {
+					ParameterValue defaultParameterValue = parameterDefinition.getDefaultParameterValue();
+					String propertyName = defaultParameterValue.getName();
+					if(propertiesMap.containsKey(propertyName)) {
+						result.add(new StringParameterValue(propertyName, propertiesMap.get(propertyName)));
+					} else {
+						result.add(defaultParameterValue);
+					}
+				}
 			}
 		}
 
