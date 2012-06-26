@@ -66,7 +66,7 @@ public class TriggerJobBuildStep extends Builder {
 		}
 
 		final AbstractProject job = (AbstractProject)topLevelItem;
-		final int nextBuildNumber = triggerBuild(build, listener, job);
+		final int nextBuildNumber = triggerBuild(build, listener, job, build.getEnvironment(listener));
 		if(nextBuildNumber < 0) {
 			listener.error("Couldn't start the build. Error code: " + nextBuildNumber);
 			return false;
@@ -79,9 +79,9 @@ public class TriggerJobBuildStep extends Builder {
 		return true;
 	}
 
-	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart) throws IOException {
+	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars) throws IOException {
 		int nextBuildNumber = jobToStart.getNextBuildNumber();
-		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, parameters, listener));
+		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, vars.expand(parameters), listener));
 		if(!addedToQueue) {
 			listener.error("Didn't start job! Apparently the same job is queued.");
 			return -1;
