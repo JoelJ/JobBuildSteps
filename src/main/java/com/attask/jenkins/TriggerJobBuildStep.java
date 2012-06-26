@@ -10,6 +10,7 @@ import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.*;
 
 /**
@@ -80,7 +81,7 @@ public class TriggerJobBuildStep extends Builder {
 
 	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart) throws IOException {
 		int nextBuildNumber = jobToStart.getNextBuildNumber();
-		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, parameters));
+		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, parameters, listener));
 		if(!addedToQueue) {
 			listener.error("Didn't start job! Apparently the same job is queued.");
 			return -1;
@@ -120,7 +121,8 @@ public class TriggerJobBuildStep extends Builder {
 		return -2;
 	}
 
-	private Action getParameterActions(AbstractProject project, String parameters) {
+	private Action getParameterActions(AbstractProject project, String parameters, BuildListener listener) {
+		PrintStream logger = listener.getLogger();
 		List<ParameterValue> result = new ArrayList<ParameterValue>();
 		Map<String, String> propertiesMap = getPropertiesMap(parameters);
 
@@ -130,11 +132,14 @@ public class TriggerJobBuildStep extends Builder {
 			List<ParameterDefinition> parameterDefinitions = projectProperties.getParameterDefinitions();
 			if(parameterDefinitions != null) {
 				for (ParameterDefinition parameterDefinition : parameterDefinitions) {
-					ParameterValue defaultParameterValue = parameterDefinition.getDefaultParameterValue();
-					String propertyName = defaultParameterValue.getName();
+					String propertyName = parameterDefinition.getName();
 					if(propertiesMap.containsKey(propertyName)) {
-						result.add(new StringParameterValue(propertyName, propertiesMap.get(propertyName)));
+						String value = propertiesMap.get(propertyName);
+						logger.println("using variable: '" + propertyName + "' -> '" + value + "'");
+						result.add(new StringParameterValue(propertyName, value));
 					} else {
+						ParameterValue defaultParameterValue = parameterDefinition.getDefaultParameterValue();
+						logger.println("using default for: '" + defaultParameterValue.getName() + "' -> '" + defaultParameterValue.toString() + "'");
 						result.add(defaultParameterValue);
 					}
 				}

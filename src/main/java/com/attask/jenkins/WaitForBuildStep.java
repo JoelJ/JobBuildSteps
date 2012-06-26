@@ -112,21 +112,21 @@ public class WaitForBuildStep extends Builder {
 		return rootUrl == null ? "/" : rootUrl;
 	}
 
-	private void copyArtifacts(String filesToCopy, Run build, File workspace, BuildListener listener) {
-		if(filesToCopy == null || filesToCopy.isEmpty() || build == null) {
+	private void copyArtifacts(String filesToCopy, Run waitedForBuild, File currentWorkspace, BuildListener listener) {
+		if(filesToCopy == null || filesToCopy.isEmpty() || waitedForBuild == null) {
 			return;
 		}
 		DirectoryScanner scanner = new DirectoryScanner();
 		scanner.setIncludes(new String[] {filesToCopy});
-		scanner.setBasedir(build.getArtifactsDir());
+		scanner.setBasedir(waitedForBuild.getArtifactsDir());
 		scanner.scan();
 		String[] includedFiles = scanner.getIncludedFiles();
 
 		for (String includedFile : includedFiles) {
 			listener.getLogger().println("Copying artifact: '" + includedFile + "'");
-			File sourceFile = new File(build.getArtifactsDir(), includedFile);
+			File sourceFile = new File(waitedForBuild.getArtifactsDir(), includedFile);
 
-			File destDir = new File(workspace, build.getParent().getName());
+			File destDir = new File(currentWorkspace, jobName);
 			if(!destDir.exists()) {
 				listener.getLogger().println("'" + destDir.getAbsolutePath() + "' doesn't exist. Creating.");
 				if(!destDir.mkdirs()) {
@@ -150,7 +150,7 @@ public class WaitForBuildStep extends Builder {
 			} catch (IOException e) {
 				listener.error("unable to copy file '" + includedFile + "' to " + destFile.getAbsolutePath() + ". " + e.getMessage());
 			}
-			listener.getLogger().println("Copied artifact: '" + includedFile + "'");
+			listener.getLogger().println("Copied artifact: '" + includedFile + "' to '" + destFile.getAbsolutePath() + "'");
 		}
 	}
 
