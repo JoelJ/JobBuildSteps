@@ -24,14 +24,16 @@ public class TriggerJobBuildStep extends Builder {
 	private final String envVarName;
 	private final String parameters;
 	private final int waitLimitMinutes;
+	private final String runOnCondition;
 
 
 	@DataBoundConstructor
-	public TriggerJobBuildStep(String jobName, String envVarName, String parameters, int waitLimitMinutes) {
+	public TriggerJobBuildStep(String jobName, String envVarName, String parameters, int waitLimitMinutes, String runOnCondition) {
 		this.jobName = jobName;
 		this.envVarName = envVarName;
 		this.parameters = parameters;
 		this.waitLimitMinutes = waitLimitMinutes <= 0 ? 15 : waitLimitMinutes;
+		this.runOnCondition = runOnCondition;
 	}
 
 	@Exported
@@ -56,6 +58,12 @@ public class TriggerJobBuildStep extends Builder {
 
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
+		String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
+		if(runOnConditionExpanded != null && !runOnConditionExpanded.isEmpty() && !isAffirmativeWord(runOnConditionExpanded)) {
+			listener.getLogger().println("Not triggering job '" + jobName + "' since 'Only run if this value is true' is '" + runOnConditionExpanded + "'");
+			return true;
+		}
+
 		EnvVars envVars = build.getEnvironment(listener);
 		final String variableName = envVars.expand(this.envVarName);
 		String jobName = envVars.expand(this.jobName);
@@ -77,6 +85,19 @@ public class TriggerJobBuildStep extends Builder {
 			build.addAction(new EnvAction(variableName, String.valueOf(nextBuildNumber)));
 		}
 		return true;
+	}
+
+	/**
+	 * Checks if the given word is either "true" or "yes".
+	 * The check is case-insensitive, and any white space is trimmed from the start and end of the given string.
+	 * @return False if the given word is null or is not "true" or "yes".
+	 */
+	private boolean isAffirmativeWord(String word) {
+		if(word == null) {
+			return false;
+		}
+		word = word.toLowerCase().trim();
+		return "true".equals(word) || "yes".equals(word);
 	}
 
 	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars) throws IOException {

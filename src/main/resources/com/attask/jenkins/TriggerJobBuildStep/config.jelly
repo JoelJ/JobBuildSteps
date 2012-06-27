@@ -6,6 +6,9 @@
 		<f:textbox/>
 	</f:entry>
 	<f:advanced>
+		<f:entry title="Only run if this value is true" field="runOnCondition">
+			<f:textbox/>
+		</f:entry>
 		<f:entry title="Parameters" field="parameters">
 			<f:textarea/>
 		</f:entry>
