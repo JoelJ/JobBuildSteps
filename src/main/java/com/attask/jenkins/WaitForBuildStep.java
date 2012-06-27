@@ -28,9 +28,10 @@ public class WaitForBuildStep extends Builder {
 	public final boolean copyBuildResult;
 	public final boolean failOnFailure;
 	public final int numberLogLinesToCopyOnFailure;
+	public final String statusVariableName;
 
     @DataBoundConstructor
-    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure) throws FormValidation {
+    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure, String statusVariableName) throws FormValidation {
         this.jobName = jobName;
 		this.buildNumber = buildNumber;
 		this.retries = retries < 0 ? 0 : retries;
@@ -39,6 +40,7 @@ public class WaitForBuildStep extends Builder {
 		this.copyBuildResult = copyBuildResult;
 		this.failOnFailure = failOnFailure;
 		this.numberLogLinesToCopyOnFailure = numberLogLinesToCopyOnFailure;
+		this.statusVariableName = statusVariableName;
     }
 
 	@Override
@@ -95,13 +97,25 @@ public class WaitForBuildStep extends Builder {
 			logger.println("Copying artifacts from downstream build.");
 			copyArtifacts(filesToCopy, buildToWaitFor, new File(build.getWorkspace().getRemote()), listener);
 
-			if(downstreamResult.isWorseOrEqualTo(Result.FAILURE) && numberLogLinesToCopyOnFailure > 0) {
-				List<String> log = buildToWaitFor.getLog(numberLogLinesToCopyOnFailure+1); //Add one more because it adds the "truncated X lines" as the first line
-				int numberPrinting = log.size() >= numberLogLinesToCopyOnFailure ? numberLogLinesToCopyOnFailure : log.size();
-				logger.println(buildToWaitFor.getFullDisplayName() + " failed. Here's the last " + numberPrinting + " console lines:");
-				for (String s : log) {
-					logger.println("["+buildToWaitFor.getFullDisplayName()+"]"+s);
+			String statusActionValue;
+			if(downstreamResult.isWorseOrEqualTo(Result.FAILURE)) {
+				statusActionValue = "false";
+				if (numberLogLinesToCopyOnFailure > 0) {
+
+					@SuppressWarnings("unchecked")
+					List<String> log = buildToWaitFor.getLog(numberLogLinesToCopyOnFailure+1); //Add one more because it adds the "truncated X lines" as the first line
+
+					int numberPrinting = log.size() >= numberLogLinesToCopyOnFailure ? numberLogLinesToCopyOnFailure : log.size();
+					logger.println(buildToWaitFor.getFullDisplayName() + " failed. Here's the last " + numberPrinting + " console lines:");
+					for (String s : log) {
+						logger.println("["+buildToWaitFor.getFullDisplayName()+"]"+s);
+					}
 				}
+			} else {
+				statusActionValue = "true";
+			}
+			if(statusVariableName != null && !statusVariableName.isEmpty()) {
+				build.addAction(new EnvAction(statusVariableName, statusActionValue));
 			}
 		}
 		return waitResult;
