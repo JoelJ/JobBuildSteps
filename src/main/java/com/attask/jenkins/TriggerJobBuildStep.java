@@ -91,6 +91,7 @@ public class TriggerJobBuildStep extends Builder {
 		listener.hyperlink(WaitForBuildStep.getRootUrl() + jobToStart.getUrl(), jobToStart.getFullDisplayName());
 		listener.getLogger().println();
 
+		int waitTimeMillis = 1000;
 		for(int attempt = 0; attempt < waitLimitMinutes * 6; attempt++) {
 			for(int jobNumber = nextBuildNumber; jobNumber < jobToStart.getNextBuildNumber(); jobNumber++) {
 				Run run = jobToStart.getBuildByNumber(jobNumber);
@@ -109,9 +110,15 @@ public class TriggerJobBuildStep extends Builder {
 
 				return run.getNumber();
 			}
+
 			try {
-				listener.getLogger().println("Job hasn't started. Waiting for 10 seconds.");
-				Thread.sleep(10000);
+				//wait for one second to start with, then double the wait time every time.
+				listener.getLogger().println("Job hasn't started. Waiting for "+ (waitTimeMillis / 1000) +" seconds.");
+				Thread.sleep(waitTimeMillis);
+				waitTimeMillis *= 2;
+				if(waitTimeMillis > 30000) {
+					waitTimeMillis = 30000; //Don't allow a single wait last more than 30 seconds.
+				}
 			} catch (InterruptedException e) {
 				listener.fatalError(e.getMessage());
 			}
