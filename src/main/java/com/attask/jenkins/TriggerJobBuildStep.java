@@ -56,6 +56,11 @@ public class TriggerJobBuildStep extends Builder {
 		return waitLimitMinutes;
 	}
 
+	@Exported
+	public String getRunOnCondition() {
+		return runOnCondition;
+	}
+
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
 		String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
