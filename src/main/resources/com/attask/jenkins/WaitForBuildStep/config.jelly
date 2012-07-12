@@ -7,9 +7,13 @@
 	</f:entry>
 
 	<f:advanced>
-		<f:entry title="Status Variable" field="statusVariableName">
-			<f:textbox/>
-		</f:entry>
+        <f:entry title="Status Variable" field="statusVariableName">
+            <f:textbox/>
+        </f:entry>
+
+        <f:entry title="Only run if this value is true" field="runOnCondition">
+            <f:textbox/>
+        </f:entry>
 
 		<f:entry title="Number of times to poll" field="retries" help="'0' for infinite">
 			<f:textbox/>

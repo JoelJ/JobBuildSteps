@@ -64,12 +64,12 @@ public class TriggerJobBuildStep extends Builder {
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
 		String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
-		if(runOnConditionExpanded != null && !runOnConditionExpanded.isEmpty() && !isAffirmativeWord(runOnConditionExpanded)) {
-			listener.getLogger().println("Not triggering job '" + jobName + "' since 'Only run if this value is true' is '" + runOnConditionExpanded + "'");
-			return true;
-		}
+        if (!shouldRun(runOnConditionExpanded)) {
+            listener.getLogger().println("Not triggering job '" + jobName + "' since 'Only run if this value is true' is '" + runOnConditionExpanded + "'");
+            return true;
+        }
 
-		EnvVars envVars = build.getEnvironment(listener);
+        EnvVars envVars = build.getEnvironment(listener);
 		final String variableName = envVars.expand(this.envVarName);
 		String jobName = envVars.expand(this.jobName);
 		TopLevelItem topLevelItem = Hudson.getInstance().getItem(jobName);
@@ -92,18 +92,36 @@ public class TriggerJobBuildStep extends Builder {
 		return true;
 	}
 
-	/**
+    public static boolean shouldRun(String runOnConditionExpanded) {
+        if(runOnConditionExpanded != null && !runOnConditionExpanded.isEmpty() && !isAffirmativeWord(runOnConditionExpanded)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
 	 * Checks if the given word is either "true" or "yes".
 	 * The check is case-insensitive, and any white space is trimmed from the start and end of the given string.
 	 * @return False if the given word is null or is not "true" or "yes".
 	 */
-	private boolean isAffirmativeWord(String word) {
-		if(word == null) {
-			return false;
-		}
-		word = word.toLowerCase().trim();
-		return "true".equals(word) || "yes".equals(word);
-	}
+	private static boolean isAffirmativeWord(String word) {
+        if (word == null) {
+            return false;
+        }
+        boolean inverse = false;
+        if (word.startsWith("!")) {
+            inverse = true;
+            word = word.substring(1);
+        }
+        boolean result = Boolean.parseBoolean(word);
+        /*
+          result = true && inverse = true: return false
+          result = true && inverse = false: return true
+          result = false && inverse = true: return true
+          result = false && inverse = false: return false
+         */
+        return result ^ inverse;
+    }
 
 	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars) throws IOException {
 		int nextBuildNumber = jobToStart.getNextBuildNumber();

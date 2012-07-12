@@ -29,12 +29,14 @@ public class WaitForBuildStep extends Builder {
 	public final boolean failOnFailure;
 	public final int numberLogLinesToCopyOnFailure;
 	public final String statusVariableName;
+    public final String runOnCondition;
 
     @DataBoundConstructor
-    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure, String statusVariableName) throws FormValidation {
+    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure, String statusVariableName, String runOnCondition) throws FormValidation {
         this.jobName = jobName;
 		this.buildNumber = buildNumber;
-		this.retries = retries < 0 ? 0 : retries;
+        this.runOnCondition = runOnCondition;
+        this.retries = retries < 0 ? 0 : retries;
 		this.delay = delay < 5000 ? 5000 : delay;
 		this.filesToCopy = filesToCopy;
 		this.copyBuildResult = copyBuildResult;
@@ -46,6 +48,13 @@ public class WaitForBuildStep extends Builder {
 	@Override
 	public boolean perform(final AbstractBuild build, Launcher launcher, final BuildListener listener) throws IOException, InterruptedException {
 		final PrintStream logger = listener.getLogger();
+
+        String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
+        if (!TriggerJobBuildStep.shouldRun(runOnConditionExpanded)) {
+            listener.getLogger().println("Not waiting for job '" + jobName + "' since 'Only run if this value is true' is '" + runOnConditionExpanded + "'");
+            return true;
+        }
+
 		EnvVars envVars = build.getEnvironment(listener);
 		Hudson jenkins = Hudson.getInstance();
 
