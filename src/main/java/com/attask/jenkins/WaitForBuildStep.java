@@ -2,11 +2,11 @@ package com.attask.jenkins;
 
 import hudson.EnvVars;
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.*;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
-import hudson.util.IOUtils;
 import org.apache.tools.ant.DirectoryScanner;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -104,7 +104,7 @@ public class WaitForBuildStep extends Builder {
 				}
 			}
 			logger.println("Copying artifacts from downstream build.");
-			copyArtifacts(filesToCopy, buildToWaitFor, new File(build.getWorkspace().getRemote()), listener);
+			copyArtifacts(filesToCopy, buildToWaitFor, listener, build);
 
 			String statusActionValue;
 			if(downstreamResult.isWorseOrEqualTo(Result.FAILURE)) {
@@ -135,45 +135,38 @@ public class WaitForBuildStep extends Builder {
 		return rootUrl == null ? "/" : rootUrl;
 	}
 
-	private void copyArtifacts(String filesToCopy, Run waitedForBuild, File currentWorkspace, BuildListener listener) {
-		if(filesToCopy == null || filesToCopy.isEmpty() || waitedForBuild == null) {
+	private void copyArtifacts(String filesToCopy, Run waitedForBuild, BuildListener listener, AbstractBuild<?, ?> currentBuild) {
+		if (filesToCopy == null || filesToCopy.isEmpty() || waitedForBuild == null) {
 			return;
 		}
 		DirectoryScanner scanner = new DirectoryScanner();
-		scanner.setIncludes(new String[] {filesToCopy});
+		scanner.setIncludes(new String[]{filesToCopy});
 		scanner.setBasedir(waitedForBuild.getArtifactsDir());
 		scanner.scan();
 		String[] includedFiles = scanner.getIncludedFiles();
 
 		for (String includedFile : includedFiles) {
-			listener.getLogger().println("Copying artifact: '" + includedFile + "'");
-			File sourceFile = new File(waitedForBuild.getArtifactsDir(), includedFile);
-
-			File destDir = new File(currentWorkspace, jobName);
-			if(!destDir.exists()) {
-				listener.getLogger().println("'" + destDir.getAbsolutePath() + "' doesn't exist. Creating.");
-				if(!destDir.mkdirs()) {
-					listener.error("Couldn't create directory '" + destDir.getAbsolutePath() + "'. Attempting to continue.");
-				}
-			}
-			File destFile = new File(destDir, sourceFile.getName());
 			try {
-				OutputStream stream = new FileOutputStream(destFile);
-				try {
-					IOUtils.copy(sourceFile, stream);
-				} finally {
-					try {
-						stream.close();
-					} catch (IOException e) {
-						listener.error("unable to close stream for file copy '" + includedFile + "' to " + destFile.getAbsolutePath() + ". " + e.getMessage());
-					}
+				FilePath artifactDirectory = currentBuild.getWorkspace();
+				if (!artifactDirectory.child(jobName).exists()) {
+					listener.getLogger().println("Directory: " + jobName + " does not exist. Creating directory: " + jobName);
+					artifactDirectory.child(jobName).mkdirs();
+					listener.getLogger().println("Created directory: " + jobName);
 				}
-			} catch (FileNotFoundException e) {
-				listener.error(e.getMessage());
+
+				File sourceFile = new File(waitedForBuild.getArtifactsDir(), includedFile);
+				FilePath copiedArtifact = artifactDirectory.child(jobName).child(sourceFile.getName());
+				try {
+					copiedArtifact.copyFrom(sourceFile.toURL());
+					listener.getLogger().println("Copied artifact: '" + includedFile + "' to '" + artifactDirectory.absolutize().toString() + "'");
+				} catch (FileNotFoundException e) {
+					listener.error(e.getMessage());
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace(listener.getLogger());
 			} catch (IOException e) {
-				listener.error("unable to copy file '" + includedFile + "' to " + destFile.getAbsolutePath() + ". " + e.getMessage());
+				e.printStackTrace(listener.getLogger());
 			}
-			listener.getLogger().println("Copied artifact: '" + includedFile + "' to '" + destFile.getAbsolutePath() + "'");
 		}
 	}
 
