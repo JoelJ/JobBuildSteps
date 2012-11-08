@@ -139,7 +139,9 @@ public class TriggerJobBuildStep extends Builder {
 		for(int attempt = 0; attempt < waitLimitMinutes * 6; attempt++) {
 			for(int jobNumber = nextBuildNumber; jobNumber < jobToStart.getNextBuildNumber(); jobNumber++) {
 				Run run = jobToStart.getBuildByNumber(jobNumber);
-
+				if(run == null) {
+					continue;
+				}
 				@SuppressWarnings("unchecked")
 				Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause)run.getCause(Cause.UpstreamCause.class);
 				if(upstreamCause == null || !upstreamCause.pointsTo(upstreamRun)) {
@@ -165,6 +167,7 @@ public class TriggerJobBuildStep extends Builder {
 				}
 			} catch (InterruptedException e) {
 				listener.fatalError(e.getMessage());
+				break;
 			}
 		}
 

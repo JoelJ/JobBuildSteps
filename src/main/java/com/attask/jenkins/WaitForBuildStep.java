@@ -164,6 +164,7 @@ public class WaitForBuildStep extends Builder {
 				}
 			} catch (InterruptedException e) {
 				e.printStackTrace(listener.getLogger());
+				break;
 			} catch (IOException e) {
 				e.printStackTrace(listener.getLogger());
 			}
