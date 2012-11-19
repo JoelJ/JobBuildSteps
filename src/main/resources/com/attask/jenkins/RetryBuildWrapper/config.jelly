@@ -1,0 +1,12 @@
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+	<f:entry title="Retry when worse than" field="worseThan" description="Can be one of the following: SUCCESS, UNSTABLE, FAILURE, NOT_BUILT, ABORTED">
+		<select name="worseThan">
+			<option value="${instance.worseThan}">${instance.worseThan == null or instance.worseThan.isEmpty() ? "Default (Failure)" : "Current ("+instance.worseThan+")"}</option>
+			<option value="SUCCESS">Success</option>
+			<option value="UNSTABLE">Unstable</option>
+			<option value="FAILURE">Failure</option>
+			<option value="NOT_BUILT">Not Built</option>
+			<option value="ABORTED">Aborted</option>
+		</select>
+	</f:entry>
+</j:jelly>

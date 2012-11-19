@@ -30,9 +30,22 @@ public class WaitForBuildStep extends Builder {
 	public final int numberLogLinesToCopyOnFailure;
 	public final String statusVariableName;
     public final String runOnCondition;
+	public final int numberRetries;
 
     @DataBoundConstructor
-    public WaitForBuildStep(String jobName, String buildNumber, int retries, int delay, String filesToCopy, boolean copyBuildResult, boolean failOnFailure, int numberLogLinesToCopyOnFailure, String statusVariableName, String runOnCondition) throws FormValidation {
+    public WaitForBuildStep(
+			String jobName,
+			String buildNumber,
+			int retries,
+			int delay,
+			String filesToCopy,
+			boolean copyBuildResult,
+			boolean failOnFailure,
+			int numberLogLinesToCopyOnFailure,
+			String statusVariableName,
+			String runOnCondition,
+			int numberRetries
+	) throws FormValidation {
         this.jobName = jobName;
 		this.buildNumber = buildNumber;
         this.runOnCondition = runOnCondition;
@@ -43,11 +56,12 @@ public class WaitForBuildStep extends Builder {
 		this.failOnFailure = failOnFailure;
 		this.numberLogLinesToCopyOnFailure = numberLogLinesToCopyOnFailure;
 		this.statusVariableName = statusVariableName;
-    }
+		this.numberRetries = numberRetries <= 0 ? 3600 : numberRetries;
+	}
 
 	@Override
 	public boolean perform(final AbstractBuild build, Launcher launcher, final BuildListener listener) throws IOException, InterruptedException {
-		final PrintStream logger = listener.getLogger();
+		PrintStream logger = listener.getLogger();
 
         String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
         if (!TriggerJobBuildStep.shouldRun(runOnConditionExpanded)) {
@@ -69,27 +83,29 @@ public class WaitForBuildStep extends Builder {
 		int buildNumber = Integer.parseInt(envVars.expand(this.buildNumber));
 
 		Job job = (Job) topLevelItem;
-		final Run buildToWaitFor = job.getBuildByNumber(buildNumber);
-		Waiter wait = new Waiter(retries, delay);
-		boolean waitResult = wait.retryUntil(new Waiter.Predicate() {
-			public boolean call() {
-				try {
-					logger.print("Checking status of build ");
-					listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
-					if (buildToWaitFor.isBuilding()) {
-						logger.print(" (building)");
-						logger.println();
-						return false;
-					} else {
-						logger.print(" (complete)");
-						logger.println();
-						return true;
-					}
-				} catch (IOException e) {
-					throw new RuntimeException(e);
+		Run buildToWaitFor = job.getBuildByNumber(buildNumber);
+		boolean waitResult;
+		while(true) {
+			waitResult = waitForBuildToFinish(listener, buildToWaitFor);
+			RetriedAction retriedAction = buildToWaitFor.getAction(RetriedAction.class);
+			if(retriedAction == null) {
+				break;
+			} else {
+				listener.getLogger().print("Build ");
+				listener.hyperlink("../../../"+buildToWaitFor.getUrl(), buildToWaitFor.getDisplayName());
+				listener.getLogger().println(" was retried. Looking for retried build.");
+				buildToWaitFor = retriedAction.findBuild(listener, numberRetries);
+				if(buildToWaitFor == null) {
+					listener.getLogger().println("Never found the retried build. It might have been canceled before it left the queue or is stuck in the queue.");
+					throw new RuntimeException("Auto retry job never started.");
 				}
+
+				listener.getLogger().print("Found retried build: ");
+				listener.hyperlink("../../../"+buildToWaitFor.getUrl(), buildToWaitFor.getDisplayName());
+				listener.getLogger().println();
 			}
-		});
+		}
+
 		if(!waitResult) {
 			listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
 			logger.println(" didn't finish");
@@ -128,6 +144,30 @@ public class WaitForBuildStep extends Builder {
 			}
 		}
 		return waitResult;
+	}
+
+	private boolean waitForBuildToFinish(final BuildListener listener, final Run buildToWaitFor) {
+		Waiter wait = new Waiter(retries, delay);
+		return wait.retryUntil(new Waiter.Predicate() {
+			public boolean call() {
+				try {
+					PrintStream logger = listener.getLogger();
+					logger.print("Checking status of build ");
+					listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
+					if (buildToWaitFor.isBuilding()) {
+						logger.print(" (building)");
+						logger.println();
+						return false;
+					} else {
+						logger.print(" (complete)");
+						logger.println();
+						return true;
+					}
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
 	}
 
 	public static String getRootUrl() {

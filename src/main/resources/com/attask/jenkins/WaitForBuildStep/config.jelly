@@ -35,5 +35,8 @@
 		<f:entry title="Number of failure lines to log" field="numberLogLinesToCopyOnFailure">
 			<f:textbox/>
 		</f:entry>
+		<f:entry title="Time to wait for restarted build to deque" field="numberRetries" description="If the downstream job auto-rebuilds itself on a failure, how long to poll on the job looking for the auto-rebuilt build. The value might be pretty high since the build can be in the queue. The value is in seconds.">
+			<f:textbox/>
+		</f:entry>
 	</f:advanced>
 </j:jelly>
