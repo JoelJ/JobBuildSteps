@@ -9,12 +9,13 @@ import hudson.model.Run;
  * Date: 11/15/12
  * Time: 8:32 PM
  */
-public class RetriedCause extends Cause {
+public class RetriedCause extends Cause.UpstreamCause {
 	private final String externalizableId;
 	private final String url;
 	private final String buildName;
 
 	public RetriedCause(Run run) {
+		super(run);
 		externalizableId = run.getExternalizableId();
 		url = run.getUrl();
 		buildName = run.getDisplayName();
