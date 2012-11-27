@@ -28,8 +28,8 @@ public class RetriedAction implements Action {
 		int newerBuildNumber = buildNumber;
 		int numberTries = 0;
 		while(true) {
-			newerBuildNumber++;
 			while(newerBuildNumber < project.getNextBuildNumber()) {
+				newerBuildNumber++;
 				Run<?, ?> newBuild = project.getBuildByNumber(newerBuildNumber);
 				RetriedCause cause = newBuild.getCause(RetriedCause.class);
 				if(cause != null) {
