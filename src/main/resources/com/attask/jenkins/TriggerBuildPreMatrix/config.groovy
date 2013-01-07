@@ -5,14 +5,23 @@ import hudson.model.Result;
 
 def f = namespace(lib.FormTagLib)
 
-f.entry(title:"Job to Execute", field:"jobName") {
+f.entry(title:"Job to Execute (Pre)", field:"jobName", description: "Job to trigger before any of the matrix jobs run. Leave empty to skip.") {
 	f.textbox()
 }
-f.entry(title:"Parameters", field:"parameters") {
+f.entry(title:"Parameters (Pre)", field:"parameters") {
 	f.textarea()
 }
+
 f.entry(title:"Results File To Inject", field:"resultsFileToInject") {
 	f.textbox()
+}
+
+f.entry(title:"Job to Execute (Post)", field:"postJobName", description: "Job to trigger after all the matrix jobs run. Leave empty to skip.") {
+	f.textbox()
+}
+
+f.entry(title:"Parameters (Post)", field:"postParameters") {
+	f.textarea()
 }
 
 f.optionalBlock (field:"runSequentially", title:_("Run each configuration sequentially"), inline:true) {
