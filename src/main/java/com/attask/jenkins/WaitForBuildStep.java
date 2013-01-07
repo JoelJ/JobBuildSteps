@@ -119,7 +119,7 @@ public class WaitForBuildStep extends Builder {
 			Result downstreamResult = buildToWaitFor.getResult();
 			if(copyBuildResult) {
 				build.setResult(downstreamResult);
-				listener.error("Downstream build ended with the status: " + downstreamResult);
+				listener.getLogger().println("Downstream build ended with the status: " + downstreamResult);
 				if(downstreamResult.isWorseOrEqualTo(Result.FAILURE) && failOnFailure) {
 					listener.error("Downstream build failed. Will not continue this build.");
 					waitResult = false; //don't continue with other jobs
