@@ -4,6 +4,7 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.matrix.MatrixBuild;
 import hudson.model.*;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
@@ -12,7 +13,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.*;
-import java.util.List;
+import java.util.*;
 
 /**
  * User: joeljohnson
@@ -31,6 +32,7 @@ public class WaitForBuildStep extends Builder {
 	public final String statusVariableName;
     public final String runOnCondition;
 	public final int numberRetries;
+	public final String propertiesFileToInject;
 
     @DataBoundConstructor
     public WaitForBuildStep(
@@ -44,7 +46,8 @@ public class WaitForBuildStep extends Builder {
 			int numberLogLinesToCopyOnFailure,
 			String statusVariableName,
 			String runOnCondition,
-			int numberRetries
+			int numberRetries,
+			String propertiesFileToInject
 	) throws FormValidation {
         this.jobName = jobName;
 		this.buildNumber = buildNumber;
@@ -57,6 +60,7 @@ public class WaitForBuildStep extends Builder {
 		this.numberLogLinesToCopyOnFailure = numberLogLinesToCopyOnFailure;
 		this.statusVariableName = statusVariableName;
 		this.numberRetries = numberRetries <= 0 ? 3600 : numberRetries;
+		this.propertiesFileToInject = propertiesFileToInject;
 	}
 
 	@Override
@@ -110,6 +114,8 @@ public class WaitForBuildStep extends Builder {
 			listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
 			logger.println(" didn't finish");
 		} else {
+			injectPropertiesFile(build, buildToWaitFor);
+
 			Result downstreamResult = buildToWaitFor.getResult();
 			if(copyBuildResult) {
 				build.setResult(downstreamResult);
@@ -144,6 +150,39 @@ public class WaitForBuildStep extends Builder {
 			}
 		}
 		return waitResult;
+	}
+
+	private void injectPropertiesFile(AbstractBuild build, Run buildToWaitFor) throws IOException, InterruptedException {
+		if(buildToWaitFor instanceof AbstractBuild && propertiesFileToInject != null && !propertiesFileToInject.isEmpty()) {
+			FilePath filePath = new FilePath(((AbstractBuild)buildToWaitFor).getWorkspace(), propertiesFileToInject);
+			Properties propertiesToInject = new Properties();
+			InputStream read = filePath.read();
+			try {
+				propertiesToInject.load(read);
+			} finally {
+				read.close();
+			}
+			Map<String, String> inject = new HashMap<String, String>(propertiesToInject.size());
+			for (Map.Entry<Object, Object> entry : propertiesToInject.entrySet()) {
+				inject.put((String)entry.getKey(), (String)entry.getValue());
+			}
+			build.addAction(new EnvMapAction(inject));
+			if(build instanceof MatrixBuild) {
+				List<ParameterValue> newParameters = new ArrayList<ParameterValue>();
+				ParametersAction action = build.getAction(ParametersAction.class);
+				if(action != null) {
+					List<ParameterValue> originalParameters = action.getParameters();
+					if(originalParameters != null) {
+						newParameters.addAll(originalParameters);
+					}
+					build.getActions().remove(action);
+				}
+				for (Map.Entry<String, String> entry : inject.entrySet()) {
+					newParameters.add(new StringParameterValue(entry.getKey(), entry.getValue(), "Injected by " + this.getClass().getSimpleName()));
+				}
+				build.addAction(new ParametersAction(newParameters));
+			}
+		}
 	}
 
 	private boolean waitForBuildToFinish(final BuildListener listener, final Run buildToWaitFor) {
