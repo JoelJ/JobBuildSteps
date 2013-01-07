@@ -3,6 +3,7 @@ package com.attask.jenkins;
 import hudson.EnvVars;
 import hudson.model.AbstractBuild;
 import hudson.model.EnvironmentContributingAction;
+import org.kohsuke.stapler.export.Exported;
 
 /**
  * User: Joel Johnson
@@ -19,6 +20,16 @@ public class EnvAction implements EnvironmentContributingAction {
 
 	public void buildEnvVars(AbstractBuild<?, ?> build, EnvVars env) {
 		env.put(name, value);
+	}
+
+	@Exported
+	public String getName() {
+		return name;
+	}
+
+	@Exported
+	public String getValue() {
+		return value;
 	}
 
 	public String getIconFileName() {return null;}
