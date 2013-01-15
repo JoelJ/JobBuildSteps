@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * User: Joel Johnson
@@ -18,6 +20,8 @@ import java.util.*;
  * Time: 1:23 PM
  */
 public class TriggerBuildPreMatrix extends DefaultMatrixExecutionStrategyImpl {
+	private static final Logger logger = Logger.getLogger("JobBuildSteps");
+
 	private String jobName;
 	private String parameters;
 
@@ -46,6 +50,7 @@ public class TriggerBuildPreMatrix extends DefaultMatrixExecutionStrategyImpl {
 
 	@Override
 	public Result run(MatrixBuild build, List<MatrixAggregator> aggregators, BuildListener listener) throws InterruptedException, IOException {
+		logger.info(build.getFullDisplayName() + " executing pre-matrix job: " + this.jobName + "\n" + parameters + "\n" + "injecting" + resultsFileToInject);
 		if (jobName != null && !jobName.isEmpty() && !executeDownstreamJob(build, listener, jobName, parameters, resultsFileToInject)){
 			return Result.FAILURE;
 		}
@@ -55,6 +60,7 @@ public class TriggerBuildPreMatrix extends DefaultMatrixExecutionStrategyImpl {
 			result = super.run(build, aggregators, listener);
 		} finally {
 			if(postJobName != null && !postJobName.isEmpty()) {
+				logger.info(build.getFullDisplayName() + " executing post-matrix job: " + this.postJobName + "\n" + postParameters);
 				//Always run the post job. But don't inject anything.
 				if(!executeDownstreamJob(build, listener, postJobName, postParameters, null)) {
 					result = Result.FAILURE;
@@ -66,10 +72,15 @@ public class TriggerBuildPreMatrix extends DefaultMatrixExecutionStrategyImpl {
 
 	private boolean executeDownstreamJob(MatrixBuild build, BuildListener listener, String jobName, String parameters, String resultsFileToInject) throws InterruptedException, IOException {
 		String uuid = "__MATRIX_"+ UUID.randomUUID().toString().replaceAll("-", "");
+		if(logger.isLoggable(Level.FINE)) {
+			logger.fine(String.format("%s: %s\n%s\n%s", build.getFullDisplayName(), jobName, parameters, resultsFileToInject));
+			logger.fine(build.getFullDisplayName() + " using uuid " + uuid);
+		}
 		TriggerJobBuildStep triggerJobBuildStep = new TriggerJobBuildStep(jobName, uuid, parameters, 0, null);
 		boolean perform = triggerJobBuildStep.perform(build, null, listener);
 		if(!perform) {
 			listener.error("There was an error triggering downstream job before matrix jobs could start.");
+			logger.severe(build.getFullDisplayName() + ": There was an error triggering downstream job before matrix jobs could start.");
 			return false;
 		}
 
@@ -85,6 +96,7 @@ public class TriggerBuildPreMatrix extends DefaultMatrixExecutionStrategyImpl {
 		}
 
 		listener.getLogger().println("Successfully triggered: " + jobName + " #" +buildNumber);
+		logger.info("Successfully triggered: " + jobName + " #" +buildNumber);
 
 		WaitForBuildStep waitForBuildStep = new WaitForBuildStep(jobName, buildNumber, 0, 0, null, true, true, 500, null, null, 0, resultsFileToInject);
 		perform = waitForBuildStep.perform(build, null, listener);
