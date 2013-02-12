@@ -29,7 +29,8 @@ public class RetryBuildWrapper extends BuildWrapper {
 		return new Environment() {
 			@Override
 			public boolean tearDown(AbstractBuild build, BuildListener listener) throws IOException, InterruptedException {
-				if(build.getResult().isWorseOrEqualTo(Result.fromString(worseThan))) {
+				Result result = build.getResult();
+				if(result != null && result.isWorseOrEqualTo(Result.fromString(worseThan))) {
 					RetriedCause cause = (RetriedCause) build.getCause(RetriedCause.class);
 					if(cause == null) {
 						build.addAction(new RetriedAction(build));
