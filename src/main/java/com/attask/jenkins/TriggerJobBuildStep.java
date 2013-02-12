@@ -114,12 +114,8 @@ public class TriggerJobBuildStep extends Builder {
             word = word.substring(1);
         }
         boolean result = Boolean.parseBoolean(word);
-        /*
-          result = true && inverse = true: return false
-          result = true && inverse = false: return true
-          result = false && inverse = true: return true
-          result = false && inverse = false: return false
-         */
+
+		//XOR to invert it if there's a '!'
         return result ^ inverse;
     }
 
