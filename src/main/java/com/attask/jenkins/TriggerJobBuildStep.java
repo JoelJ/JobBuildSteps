@@ -26,7 +26,6 @@ public class TriggerJobBuildStep extends Builder {
 	private final int waitLimitMinutes;
 	private final String runOnCondition;
 
-
 	@DataBoundConstructor
 	public TriggerJobBuildStep(String jobName, String envVarName, String parameters, int waitLimitMinutes, String runOnCondition) {
 		this.jobName = jobName;
@@ -61,6 +60,10 @@ public class TriggerJobBuildStep extends Builder {
 		return runOnCondition;
 	}
 
+	public boolean checkTriggerOnly() {
+		return envVarName == null || envVarName.trim().isEmpty();
+	}
+
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
 		String runOnConditionExpanded = build.getEnvironment(listener).expand(this.runOnCondition);
@@ -79,15 +82,27 @@ public class TriggerJobBuildStep extends Builder {
 		}
 
 		final AbstractProject job = (AbstractProject)topLevelItem;
-		final int nextBuildNumber = triggerBuild(build, listener, job, build.getEnvironment(listener));
-		if(nextBuildNumber < 0) {
-			listener.error("Couldn't start the build. Error code: " + nextBuildNumber);
-			return false;
+		boolean triggerOnly = checkTriggerOnly();
+		final Run nextBuild = triggerBuild(build, listener, job, build.getEnvironment(listener), triggerOnly);
+		if(nextBuild == null) {
+			if(triggerOnly) {
+				listener.error("Couldn't start the build.");
+				return false;
+			} else {
+				return true;
+			}
 		}
 
+		DownstreamBuildsAction action = build.getAction(DownstreamBuildsAction.class);
+		if(action == null) {
+			action = new DownstreamBuildsAction();
+			build.addAction(action);
+		}
+		action.addDownstreamBuild(nextBuild);
+
 		if(variableName != null && !variableName.isEmpty()) {
-			listener.getLogger().println("setting environment variable '" + variableName + "' to '" + nextBuildNumber + "'");
-			build.addAction(new EnvAction(variableName, String.valueOf(nextBuildNumber)));
+			listener.getLogger().println("setting environment variable '" + variableName + "' to '" + nextBuild.getNumber() + "'");
+			build.addAction(new EnvAction(variableName, String.valueOf(nextBuild.getNumber())));
 		}
 		return true;
 	}
@@ -119,12 +134,17 @@ public class TriggerJobBuildStep extends Builder {
         return result ^ inverse;
     }
 
-	private int triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars) throws IOException {
+	private Run triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars, boolean triggerOnly) throws IOException {
 		int nextBuildNumber = jobToStart.getNextBuildNumber();
 		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, vars.expand(parameters), listener));
 		if(!addedToQueue) {
 			listener.error("Didn't start job! Apparently the same job is queued.");
-			return -1;
+			return null;
+		}
+
+		if(triggerOnly) {
+			listener.getLogger().println("Only triggering the build. Not waiting to get a build number.");
+			return null;
 		}
 
 		listener.getLogger().print("Queued job ");
@@ -150,7 +170,7 @@ public class TriggerJobBuildStep extends Builder {
 				listener.hyperlink(WaitForBuildStep.getRootUrl() + run.getUrl(), run.getDisplayName());
 				listener.getLogger().println();
 
-				return run.getNumber();
+				return run;
 			}
 
 			try {
@@ -168,7 +188,7 @@ public class TriggerJobBuildStep extends Builder {
 		}
 
 		listener.error("Couldn't find started job!");
-		return -2;
+		return null;
 	}
 
 	private Action getParameterActions(AbstractProject project, String parameters, BuildListener listener) {
