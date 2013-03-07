@@ -182,7 +182,11 @@ public class TriggerJobBuildStep extends Builder {
 		}
 	}
 
-	private Action getParameterActions(AbstractProject project, String parameters, BuildListener listener) {
+	public static Action getParameterActions(AbstractProject project, String parameters, BuildListener listener) {
+		return getParameterActions(project, parameters, listener, true);
+	}
+
+	public static Action getParameterActions(AbstractProject project, String parameters, BuildListener listener, boolean echoParameters) {
 		PrintStream logger = listener.getLogger();
 		List<ParameterValue> result = new ArrayList<ParameterValue>();
 		Map<String, String> propertiesMap = getPropertiesMap(parameters);
@@ -196,11 +200,15 @@ public class TriggerJobBuildStep extends Builder {
 					String propertyName = parameterDefinition.getName();
 					if(propertiesMap.containsKey(propertyName)) {
 						String value = propertiesMap.get(propertyName);
-						logger.println("using variable: '" + propertyName + "' -> '" + value + "'");
+						if(echoParameters) {
+							logger.println("using variable: '" + propertyName + "' -> '" + value + "'");
+						}
 						result.add(new StringParameterValue(propertyName, value));
 					} else {
 						ParameterValue defaultParameterValue = parameterDefinition.getDefaultParameterValue();
-						logger.println("using default for: '" + defaultParameterValue.getName() + "' -> '" + defaultParameterValue.toString() + "'");
+						if(echoParameters) {
+							logger.println("using default for: '" + defaultParameterValue.getName() + "' -> '" + defaultParameterValue.toString() + "'");
+						}
 						result.add(defaultParameterValue);
 					}
 				}
@@ -210,7 +218,7 @@ public class TriggerJobBuildStep extends Builder {
 		return new ParametersAction(result);
 	}
 
-	private Map<String, String> getPropertiesMap(String parameters) {
+	private static Map<String, String> getPropertiesMap(String parameters) {
 		String[] split = parameters.split("\n");
 		Map<String, String> properties = new HashMap<String, String>();
 		for(int i = 0; i < split.length; i++) {
