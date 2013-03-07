@@ -19,26 +19,26 @@ import java.util.List;
  */
 @ExportedBean
 public class DownstreamBuildsAction implements Action {
-	private final List<String> downstreamBuilds;
+	private final List<String> downstreamBuildIds;
 
 	public DownstreamBuildsAction() {
-		this.downstreamBuilds = new ArrayList<String>();
+		this.downstreamBuildIds = new ArrayList<String>();
 	}
 
 	public void addDownstreamBuild(Run run) {
-		synchronized (downstreamBuilds) {
-			downstreamBuilds.add(run.getExternalizableId());
+		synchronized (downstreamBuildIds) {
+			downstreamBuildIds.add(run.getExternalizableId());
 		}
 	}
 
-	@Exported
-	public List<String> getDownstreamBuilds() {
-		return Collections.unmodifiableList(downstreamBuilds);
+	public List<String> getDownstreamBuildIds() {
+		return Collections.unmodifiableList(downstreamBuildIds);
 	}
 
-	public List<Run> findDownstreamBuilds() {
-		List<Run> result = new ArrayList<Run>(downstreamBuilds.size());
-		for (String downstreamBuildId : downstreamBuilds) {
+	@Exported
+	public List<Run> getDownstreamBuilds() {
+		List<Run> result = new ArrayList<Run>(downstreamBuildIds.size());
+		for (String downstreamBuildId : downstreamBuildIds) {
 			Run<?, ?> run = Run.fromExternalizableId(downstreamBuildId);
 			if(run != null) {
 				result.add(run);

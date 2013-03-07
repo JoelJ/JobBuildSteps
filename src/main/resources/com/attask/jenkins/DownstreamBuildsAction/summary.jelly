@@ -12,7 +12,7 @@
 	<div id="downstreamBuilds">
 		<h3>Downstream Builds</h3>
 		<ul>
-			<j:forEach var="downstreamBuild" items="${it.findDownstreamBuilds()}">
+			<j:forEach var="downstreamBuild" items="${it.getDownstreamBuilds()}">
 				<li>
 					<a class="orb" href="${rootURL}/${downstreamBuild.url}console"><img src="${it.findOrb(downstreamBuild)}" /></a>
 					<a href="${rootURL}/${downstreamBuild.url}">${downstreamBuild.fullDisplayName}</a>
