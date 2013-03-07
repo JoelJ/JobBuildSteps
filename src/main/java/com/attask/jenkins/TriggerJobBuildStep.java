@@ -4,6 +4,7 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.model.*;
+import hudson.model.queue.QueueTaskFuture;
 import hudson.tasks.Builder;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.export.Exported;
@@ -12,6 +13,7 @@ import org.kohsuke.stapler.export.ExportedBean;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 /**
  * User: joeljohnson
@@ -135,9 +137,25 @@ public class TriggerJobBuildStep extends Builder {
     }
 
 	private Run triggerBuild(Run upstreamRun, BuildListener listener, final AbstractProject jobToStart, EnvVars vars, boolean triggerOnly) throws IOException {
-		int nextBuildNumber = jobToStart.getNextBuildNumber();
-		boolean addedToQueue = jobToStart.scheduleBuild(0, new Cause.UpstreamCause(upstreamRun), getParameterActions(jobToStart, vars.expand(parameters), listener));
-		if(!addedToQueue) {
+		Action parameterActions = getParameterActions(jobToStart, vars.expand(parameters), listener);
+		QueueTaskFuture<Build> queueTaskFuture = null;
+
+		int retries = 0;
+		while(retries < 5) {
+			++retries;
+			queueTaskFuture = jobToStart.scheduleBuild2(0, new Cause.UpstreamCause(upstreamRun), Arrays.asList(parameterActions));
+			if(queueTaskFuture == null) {
+				try {
+					listener.error("Unable to queue job. Trying again in 5 seconds. (try: " + retries + "/5)");
+					Thread.sleep(5000);
+				} catch (InterruptedException e) {
+					throw new IOException(e);
+				}
+			} else {
+				break;
+			}
+		}
+		if(queueTaskFuture == null) {
 			listener.error("Didn't start job! Apparently the same job is queued.");
 			return null;
 		}
@@ -151,44 +169,17 @@ public class TriggerJobBuildStep extends Builder {
 		listener.hyperlink(WaitForBuildStep.getRootUrl() + jobToStart.getUrl(), jobToStart.getFullDisplayName());
 		listener.getLogger().println();
 
-		int waitTimeMillis = 1000;
-		for(int attempt = 0; attempt < waitLimitMinutes * 6; attempt++) {
-			for(int jobNumber = nextBuildNumber; jobNumber < jobToStart.getNextBuildNumber(); jobNumber++) {
-				Run run = jobToStart.getBuildByNumber(jobNumber);
-				if(run == null) {
-					continue;
-				}
-				@SuppressWarnings("unchecked")
-				Cause.UpstreamCause upstreamCause = (Cause.UpstreamCause)run.getCause(Cause.UpstreamCause.class);
-				if(upstreamCause == null || !upstreamCause.pointsTo(upstreamRun)) {
-					continue;
-				}
-
-				listener.getLogger().print("Started job ");
-				listener.hyperlink(WaitForBuildStep.getRootUrl() + jobToStart.getUrl(), jobToStart.getFullDisplayName());
-				listener.getLogger().print(" ");
-				listener.hyperlink(WaitForBuildStep.getRootUrl() + run.getUrl(), run.getDisplayName());
-				listener.getLogger().println();
-
-				return run;
-			}
-
-			try {
-				//wait for one second to start with, then double the wait time every time.
-				listener.getLogger().println("Job hasn't started. Waiting for "+ (waitTimeMillis / 1000) +" seconds.");
-				Thread.sleep(waitTimeMillis);
-				waitTimeMillis *= 2;
-				if(waitTimeMillis > 30000) {
-					waitTimeMillis = 30000; //Don't allow a single wait last more than 30 seconds.
-				}
-			} catch (InterruptedException e) {
-				listener.fatalError(e.getMessage());
-				break;
-			}
+		try {
+			Build build = queueTaskFuture.waitForStart();
+			listener.getLogger().print("Run started: ");
+			listener.hyperlink(WaitForBuildStep.getRootUrl() + build.getUrl(), build.getFullDisplayName());
+			listener.getLogger().println();
+			return build;
+		} catch (InterruptedException e) {
+			throw new IOException(e);
+		} catch (ExecutionException e) {
+			throw new IOException(e);
 		}
-
-		listener.error("Couldn't find started job!");
-		return null;
 	}
 
 	private Action getParameterActions(AbstractProject project, String parameters, BuildListener listener) {
