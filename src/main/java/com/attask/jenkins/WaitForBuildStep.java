@@ -185,28 +185,22 @@ public class WaitForBuildStep extends Builder {
 		}
 	}
 
-	private boolean waitForBuildToFinish(final BuildListener listener, final Run buildToWaitFor) {
+	private boolean waitForBuildToFinish(final BuildListener listener, final Run buildToWaitFor) throws IOException {
+		PrintStream logger = listener.getLogger();
+
+		logger.print("Waiting for build ");
+		listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
+		logger.println();
+
 		Waiter wait = new Waiter(retries, delay);
-		return wait.retryUntil(new Waiter.Predicate() {
+		boolean result = wait.retryUntil(new Waiter.Predicate() {
 			public boolean call() {
-				try {
-					PrintStream logger = listener.getLogger();
-					logger.print("Checking status of build ");
-					listener.hyperlink(getRootUrl() + buildToWaitFor.getUrl(), buildToWaitFor.getFullDisplayName());
-					if (buildToWaitFor.isBuilding()) {
-						logger.print(" (building)");
-						logger.println();
-						return false;
-					} else {
-						logger.print(" (complete)");
-						logger.println();
-						return true;
-					}
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
+				return !buildToWaitFor.isBuilding();
 			}
 		});
+
+		logger.println("... Done!");
+		return result;
 	}
 
 	public static String getRootUrl() {
