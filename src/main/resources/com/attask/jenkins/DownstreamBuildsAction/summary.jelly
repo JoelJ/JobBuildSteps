@@ -1,0 +1,28 @@
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+	<style>
+		#downstreamBuilds li {
+			list-style-type: none;
+		}
+		#downstreamBuilds li .orb img {
+			width: 13px;
+			height: 13px;
+			margin-right: 3px;
+		}
+	</style>
+	<div id="downstreamBuilds">
+		<h3>Downstream Builds</h3>
+		<ul>
+			<j:forEach var="downstreamBuild" items="${it.findDownstreamBuilds()}">
+				<li>
+					<a class="orb" href="${rootURL}/${downstreamBuild.url}console"><img src="${it.findOrb(downstreamBuild)}" /></a>
+					<a href="${rootURL}/${downstreamBuild.url}">${downstreamBuild.fullDisplayName}</a>
+
+					<j:set var="testCount" value="${it.findFailureCount(downstreamBuild)}" />
+					<j:if test="${testCount != null}">
+						(<a href="${rootURL}/${downstreamBuild.url}/testReport">${testCount} failures</a>)
+					</j:if>
+				</li>
+			</j:forEach>
+		</ul>
+	</div>
+</j:jelly>
